@@ -6,73 +6,77 @@ spring:
     compose:
       enabled: false
 
-    jpa:
-      hibernate:
-        ddl-auto: validate
-      show-sql: false
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
 
-    flyway:
-      enabled: true
-      locations: classpath:db/migration
-      baseline-on-migrate: false
-      clean-disabled: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    clean-disabled: true
 
-    sql:
-      init:
-        mode: never
+  sql:
+    init:
+      mode: never
 
-  server:
-    port: 8080
-    shutdown: graceful
-    error:
-      include-message: never
-      include-stacktrace: never
-      include-binding-errors: never
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
 
-  management:
-    endpoints:
-      web:
-        exposure:
-          include: health
+server:
+  port: 8080
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
 
-    endpoint:
-      health:
-        show-details: never
-        probes:
-          enabled: true
-        group:
-          liveness:
-            include: livenessState
-          readiness:
-            include: readinessState,db
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
 
-    tracing:
-      sampling:
-        probability: 0.1
-      export:
-        otlp:
-          enabled: false
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
 
-    logging:
-      export:
-        otlp:
-          enabled: false
-
-    otlp:
-      metrics:
-        export:
-          enabled: false
-
-  springdoc:
-    api-docs:
-      enabled: false
-    swagger-ui:
-      enabled: false
-
-  app:
-    init-db: false
+  tracing:
+    sampling:
+      probability: 0.1
+    export:
+      otlp:
+        enabled: false
 
   logging:
-    level:
-      root: INFO
-      de.mtala: INFO
+    export:
+      otlp:
+        enabled: false
+
+  otlp:
+    metrics:
+      export:
+        enabled: false
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+app:
+  init-db: false
+
+logging:
+  level:
+    root: INFO
+    de.mtala: INFO

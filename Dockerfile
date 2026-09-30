@@ -14,5 +14,8 @@ RUN addgroup --system spring && adduser --system --ingroup spring spring
 USER spring:spring
 
 COPY --from=build /app/target/*.jar app.jar
+
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
