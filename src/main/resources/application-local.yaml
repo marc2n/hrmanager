@@ -1,0 +1,46 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driverClassName: org.postgresql.Driver
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
+  tracing:
+    sampling:
+      probability: 1.0
+    export:
+      otlp:
+        enabled: true
+  logging:
+    export:
+      otlp:
+        enabled: true
+
+  otlp:
+    metrics:
+      export:
+        enabled: true
+        url: ${LOCAL_OTLP_BASE_URL:http://localhost:4318}/v1/metrics # 1. Metrics Export Configuration
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${LOCAL_OTLP_BASE_URL:http://localhost:4318}/v1/traces # 2. Tracing Export Configuration
+    logging:
+      export:
+        otlp:
+          endpoint: ${LOCAL_OTLP_BASE_URL:http://localhost:4318}/v1/logs # 3. Logging Export Configuration
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+app:
+  init-db: ${INIT_DB:false}

@@ -2,15 +2,57 @@ services:
   grafana-lgtm:
     image: 'grafana/otel-lgtm:latest'
     ports:
-      - '3000:3000'
-      - '4317'
-      - '4318'
+      - '3000:3000'   # Grafana UI
+      - '4317:4317'
+      - '4318:4318'
+    environment:
+      - ENABLE_LOGS_ALL=true
+    restart: unless-stopped
+    networks:
+      - mynetwork
+
   postgres:
     image: 'postgres:18'
-    container_name: hr-postgres
+    container_name: hrdatabase
     environment:
       - POSTGRES_DB=${SPRING_DATASOURCE_DATABASE_NAME}
       - POSTGRES_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
       - POSTGRES_USER=${SPRING_DATASOURCE_USERNAME}
+    networks:
+      - mynetwork
     ports:
-      - '5432'
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${SPRING_DATASOURCE_USERNAME} -d ${SPRING_DATASOURCE_DATABASE_NAME}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  hrbackend:
+    build: .
+    container_name: hrbackend
+    environment:
+      - SPRING_PROFILES_ACTIVE=local
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - LOCAL_OTLP_BASE_URL=http://grafana-lgtm:4318
+      - INIT_DB=${INIT_DB}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      grafana-lgtm:
+        condition: service_started
+    networks:
+      - mynetwork
+
+networks:
+  mynetwork:
+    driver: bridge
+
+volumes:
+  postgres_data:

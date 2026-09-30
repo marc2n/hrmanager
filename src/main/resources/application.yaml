@@ -1,0 +1,78 @@
+spring:
+  application:
+    name: hrmanager
+
+  docker:
+    compose:
+      enabled: false
+
+    jpa:
+      hibernate:
+        ddl-auto: validate
+      show-sql: false
+
+    flyway:
+      enabled: true
+      locations: classpath:db/migration
+      baseline-on-migrate: false
+      clean-disabled: true
+
+    sql:
+      init:
+        mode: never
+
+  server:
+    port: 8080
+    shutdown: graceful
+    error:
+      include-message: never
+      include-stacktrace: never
+      include-binding-errors: never
+
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health
+
+    endpoint:
+      health:
+        show-details: never
+        probes:
+          enabled: true
+        group:
+          liveness:
+            include: livenessState
+          readiness:
+            include: readinessState,db
+
+    tracing:
+      sampling:
+        probability: 0.1
+      export:
+        otlp:
+          enabled: false
+
+    logging:
+      export:
+        otlp:
+          enabled: false
+
+    otlp:
+      metrics:
+        export:
+          enabled: false
+
+  springdoc:
+    api-docs:
+      enabled: false
+    swagger-ui:
+      enabled: false
+
+  app:
+    init-db: false
+
+  logging:
+    level:
+      root: INFO
+      de.mtala: INFO
