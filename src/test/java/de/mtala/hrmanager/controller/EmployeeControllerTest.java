@@ -1,5 +1,6 @@
 package de.mtala.hrmanager.controller;
 
+import de.mtala.hrmanager.dto.EmployeeRequestDto;
 import de.mtala.hrmanager.dto.EmployeeResponseDto;
 import de.mtala.hrmanager.model.EmploymentStatus;
 import de.mtala.hrmanager.service.EmployeeService;
@@ -15,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,6 +40,48 @@ class EmployeeControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertSame(employees, response.getBody());
         verify(employeeService).getAllEmployees();
+    }
+
+    @Test
+    void getEmployeeByIdReturnsOkAndEmployee() {
+        EmployeeResponseDto employee = employee();
+        when(employeeService.getEmployeeById(1L)).thenReturn(employee);
+
+        ResponseEntity<EmployeeResponseDto> response = employeeController.getEmployeeById(1L);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertSame(employee, response.getBody());
+        verify(employeeService).getEmployeeById(1L);
+    }
+
+    @Test
+    void createEmployeeReturnsCreatedAndEmployee() {
+        EmployeeRequestDto request = new EmployeeRequestDto(
+                "Ada",
+                "Lovelace",
+                "ada@example.com",
+                Instant.parse("2026-01-10T00:00:00Z"),
+                EmploymentStatus.ACTIVE,
+                "Engineering",
+                BigDecimal.valueOf(100000)
+        );
+        EmployeeResponseDto created = employee();
+        when(employeeService.createEmployee(request)).thenReturn(created);
+
+        ResponseEntity<EmployeeResponseDto> response = employeeController.createEmployee(request);
+
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertSame(created, response.getBody());
+        verify(employeeService).createEmployee(request);
+    }
+
+    @Test
+    void deleteEmployeeReturnsNoContent() {
+        ResponseEntity<Void> response = employeeController.deleteEmployee(1L);
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        assertNull(response.getBody());
+        verify(employeeService).deleteEmployee(1L);
     }
 
     private EmployeeResponseDto employee() {
