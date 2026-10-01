@@ -71,6 +71,7 @@ jobs:
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_postgres_admin_password: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -88,6 +89,7 @@ jobs:
           : "${ARM_CLIENT_ID:?Set AZURE_CLIENT_ID in dev-infra variables}"
           : "${ARM_TENANT_ID:?Set AZURE_TENANT_ID in repository variables}"
           : "${ARM_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID in repository variables}"
+          : "${TF_VAR_postgres_admin_password:?Set POSTGRES_ADMIN_PASSWORD in dev-infra secrets
 
       - name: Initialize remote backend
         run: terraform init -lockfile=readonly
@@ -108,7 +110,7 @@ jobs:
     needs: plan
     if: inputs.apply
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
 
     environment:
       name: dev-infra

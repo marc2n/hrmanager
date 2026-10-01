@@ -20,3 +20,15 @@ variable "container_registry_name" {
     error_message = "Use 5–50 lowercase letters or numbers."
   }
 }
+
+variable "postgres_server_name" {
+  description = "Globally unique PostgreSQL server name."
+  type        = string
+  default     = "psql-marc2n-hrmanager-dev"
+}
+
+variable "postgres_admin_password" {
+  description = "Administrator password supplied through GitHub Secrets."
+  type        = string
+  sensitive   = true
+}
