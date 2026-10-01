@@ -1,0 +1,150 @@
+name: Terraform Dev
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply the Terraform plan"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-dev
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: "1.15.7"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+defaults:
+  run:
+    shell: bash
+    working-directory: infra/dev
+
+jobs:
+  check:
+    name: Check Terraform
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+
+      - name: Initialize without remote backend
+        run: terraform init -backend=false -lockfile=readonly
+
+      - name: Validate configuration
+        run: terraform validate
+
+  plan:
+    name: Plan Terraform
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    environment:
+      name: dev-infra
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_USE_CLI: "false"
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Check required Azure variables
+        run: |
+          set -euo pipefail
+          : "${ARM_CLIENT_ID:?Set AZURE_CLIENT_ID in dev-infra variables}"
+          : "${ARM_TENANT_ID:?Set AZURE_TENANT_ID in repository variables}"
+          : "${ARM_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID in repository variables}"
+
+      - name: Initialize remote backend
+        run: terraform init -lockfile=readonly
+
+      - name: Create execution plan
+        run: terraform plan -lock-timeout=5m -out=dev.tfplan
+
+      - name: Upload execution plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-dev-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: infra/dev/dev.tfplan
+          if-no-files-found: error
+          retention-days: 1
+
+  apply:
+    name: Apply Terraform
+    needs: plan
+    if: inputs.apply
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    environment:
+      name: dev-infra
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_USE_CLI: "false"
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Initialize remote backend
+        run: terraform init -lockfile=readonly
+
+      - name: Download execution plan
+        uses: actions/download-artifact@v5
+        with:
+          name: terraform-dev-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: infra/dev
+
+      - name: Apply saved execution plan
+        run: terraform apply -lock-timeout=5m dev.tfplan
+
+      - name: Display infrastructure outputs
+        run: terraform output
