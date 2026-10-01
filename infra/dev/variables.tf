@@ -32,3 +32,9 @@ variable "postgres_admin_password" {
   type        = string
   sensitive   = true
 }
+
+variable "application_image" {
+  description = "Exact application image to deploy."
+  type        = string
+  default     = "acrmarc2nhrmanagertfdev.azurecr.io/hr-app@sha256:f84bf91fba51e2ef76b810f6ad766ab31e740ea71eee0f150b00624d09c163ed"
+}

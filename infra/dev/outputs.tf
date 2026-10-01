@@ -57,3 +57,18 @@ output "runtime_identity_principal_id" {
   description = "Principal ID used to grant the runtime identity AcrPull."
   value       = azurerm_user_assigned_identity.app_runtime.principal_id
 }
+
+output "container_app_name" {
+  description = "Name of the application Container App."
+  value       = azurerm_container_app.app.name
+}
+
+output "container_app_id" {
+  description = "Resource ID used for application deployment permissions."
+  value       = azurerm_container_app.app.id
+}
+
+output "application_url" {
+  description = "Public HTTPS endpoint of the application."
+  value       = "https://${azurerm_container_app.app.ingress[0].fqdn}"
+}
