@@ -38,3 +38,9 @@ variable "runtime_identity_principal_id" {
   type        = string
   default     = null
 }
+
+variable "runtime_identity_id" {
+  description = "Resource ID of the Container App runtime identity."
+  type        = string
+  default     = null
+}

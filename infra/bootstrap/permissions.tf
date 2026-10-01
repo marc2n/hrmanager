@@ -36,3 +36,19 @@ resource "azurerm_role_assignment" "runtime_acr_pull" {
   principal_id         = var.runtime_identity_principal_id
   principal_type       = "ServicePrincipal"
 }
+
+resource "azurerm_role_assignment" "github_app_deployment" {
+  scope                = azurerm_resource_group.app.id
+  role_definition_name = "Container Apps Contributor"
+  principal_id         = azurerm_user_assigned_identity.github_app.principal_id
+  principal_type       = "ServicePrincipal"
+}
+
+resource "azurerm_role_assignment" "github_app_runtime_identity" {
+  count = var.runtime_identity_id != null ? 1 : 0
+
+  scope                = var.runtime_identity_id
+  role_definition_name = "Managed Identity Operator"
+  principal_id         = azurerm_user_assigned_identity.github_app.principal_id
+  principal_type       = "ServicePrincipal"
+}
