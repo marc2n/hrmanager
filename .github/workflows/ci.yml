@@ -221,7 +221,7 @@ jobs:
       cancel-in-progress: false
 
     env:
-      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
       CONTAINER_APP_NAME: ${{ vars.CONTAINER_APP_NAME }}
       IMAGE_REFERENCE: ${{ needs.publish.outputs.image_reference }}
 
