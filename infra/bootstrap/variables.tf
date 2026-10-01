@@ -26,3 +26,9 @@ variable "state_storage_account_name" {
     error_message = "Use 3–24 lowercase letters and numbers only."
   }
 }
+
+variable "container_registry_id" {
+  description = "Existing dev registry resource ID. Set after the registry is deployed."
+  type        = string
+  default     = null
+}
