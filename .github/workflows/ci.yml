@@ -8,6 +8,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish and deploy the verified image to dev"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -83,6 +89,7 @@ jobs:
           push: false
           load: true
           tags: hrmanager:latest
+          platforms: linux/amd64
 
       - name: Run Trivy vulnerability scanner on Docker Image
         uses: aquasecurity/trivy-action@v0.36.0
@@ -93,3 +100,104 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           severity: 'CRITICAL'
+
+      - name: Export verified Docker image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.publish
+        shell: bash
+        run: docker save --output "$RUNNER_TEMP/hr-app.tar" hrmanager:latest
+
+      - name: Upload verified Docker image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.publish
+        uses: actions/upload-artifact@v4
+        with:
+          name: hr-app-image
+          path: ${{ runner.temp }}/hr-app.tar
+          retention-days: 1
+          compression-level: 0
+          overwrite: true
+          if-no-files-found: error
+
+  publish:
+    name: Publish verified image to ACR
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    environment:
+      name: dev-app
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      ACR_NAME: ${{ secrets.ACR_NAME }}
+      ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+      IMAGE_REPOSITORY: hr-app
+      IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+    outputs:
+      image_reference: ${{ steps.image.outputs.image_reference }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check registry variables
+        run: |
+          set -euo pipefail
+          : "${ACR_NAME:?Set ACR_NAME in dev-app variables}"
+          : "${ACR_LOGIN_SERVER:?Set ACR_LOGIN_SERVER in dev-app variables}"
+
+      - name: Download verified Docker image
+        uses: actions/download-artifact@v5
+        with:
+          name: hr-app-image
+          path: ${{ runner.temp }}
+
+      - name: Load and tag image
+        run: |
+          set -euo pipefail
+          docker load --input "$RUNNER_TEMP/hr-app.tar"
+          docker tag hrmanager:latest \
+            "$ACR_LOGIN_SERVER/$IMAGE_REPOSITORY:$IMAGE_TAG"
+
+      - name: Login to Azure using OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to container registry
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Push verified image
+        run: docker push "$ACR_LOGIN_SERVER/$IMAGE_REPOSITORY:$IMAGE_TAG"
+
+      - name: Record published image
+        id: image
+        run: |
+          set -euo pipefail
+
+          IMAGE_DIGEST=$(az acr repository show \
+            --name "$ACR_NAME" \
+            --image "$IMAGE_REPOSITORY:$IMAGE_TAG" \
+            --query digest \
+            --output tsv)
+
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+
+          IMAGE_REFERENCE="$ACR_LOGIN_SERVER/$IMAGE_REPOSITORY@$IMAGE_DIGEST"
+
+          echo "image_reference=$IMAGE_REFERENCE" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Published application image"
+            echo ""
+            echo "- Tag: $IMAGE_TAG"
+            echo "- Deployment reference: $IMAGE_REFERENCE"
+            echo "- Source commit: $GITHUB_SHA"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
