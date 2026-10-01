@@ -42,3 +42,18 @@ output "postgres_username" {
   description = "Database login for the initial dev deployment."
   value       = azurerm_postgresql_flexible_server.app.administrator_login
 }
+
+output "container_app_environment_id" {
+  description = "Resource ID of the Container Apps environment."
+  value       = azurerm_container_app_environment.app.id
+}
+
+output "runtime_identity_id" {
+  description = "Managed identity resource ID to attach to the Container App."
+  value       = azurerm_user_assigned_identity.app_runtime.id
+}
+
+output "runtime_identity_principal_id" {
+  description = "Principal ID used to grant the runtime identity AcrPull."
+  value       = azurerm_user_assigned_identity.app_runtime.principal_id
+}
