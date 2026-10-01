@@ -32,3 +32,9 @@ variable "container_registry_id" {
   type        = string
   default     = null
 }
+
+variable "runtime_identity_principal_id" {
+  description = "Principal ID of the Container App runtime identity."
+  type        = string
+  default     = null
+}

@@ -27,3 +27,12 @@ resource "azurerm_role_assignment" "github_app_acr_push" {
   principal_id         = azurerm_user_assigned_identity.github_app.principal_id
   principal_type       = "ServicePrincipal"
 }
+
+resource "azurerm_role_assignment" "runtime_acr_pull" {
+  count = (var.container_registry_id != null && var.runtime_identity_principal_id != null) ? 1 : 0
+
+  scope                = var.container_registry_id
+  role_definition_name = "AcrPull"
+  principal_id         = var.runtime_identity_principal_id
+  principal_type       = "ServicePrincipal"
+}
