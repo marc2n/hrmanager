@@ -35,3 +35,21 @@ build/
 *.env
 .env.*
 !.env.example
+
+# Terraform working directories
+**/.terraform/*
+
+# Local state and backups
+*.tfstate
+*.tfstate.*
+
+# Local input values
+*.tfvars
+*.tfvars.json
+
+# Saved plans
+*.tfplan
+
+# Terraform crash logs
+crash.log
+crash.*.log
