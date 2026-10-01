@@ -201,3 +201,129 @@ jobs:
             echo "- Deployment reference: $IMAGE_REFERENCE"
             echo "- Source commit: $GITHUB_SHA"
           } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy and verify application
+    needs: publish
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    environment:
+      name: dev-app
+
+    permissions:
+      contents: read
+      id-token: write
+
+    concurrency:
+      group: terraform-dev
+      cancel-in-progress: false
+
+    env:
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      CONTAINER_APP_NAME: ${{ vars.CONTAINER_APP_NAME }}
+      IMAGE_REFERENCE: ${{ needs.publish.outputs.image_reference }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check deployment variables
+        run: |
+          set -euo pipefail
+          : "${AZURE_RESOURCE_GROUP:?Set AZURE_RESOURCE_GROUP}"
+          : "${CONTAINER_APP_NAME:?Set CONTAINER_APP_NAME in dev-app}"
+          : "${IMAGE_REFERENCE:?Published image reference is missing}"
+
+      - name: Login to Azure using OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy published image
+        id: deployment
+        run: |
+          set -euo pipefail
+
+          REVISION=$(az containerapp update \
+            --name "$CONTAINER_APP_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --container-name hr-app \
+            --image "$IMAGE_REFERENCE" \
+            --query properties.latestRevisionName \
+            --output tsv)
+
+          test -n "$REVISION"
+
+          echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
+          echo "Target revision: $REVISION"
+
+      - name: Verify revision and application readiness
+        env:
+          TARGET_REVISION: ${{ steps.deployment.outputs.revision }}
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 60); do
+            REVISION_JSON=$(az containerapp revision show \
+              --name "$CONTAINER_APP_NAME" \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --revision "$TARGET_REVISION" \
+              --output json)
+
+            ACTUAL_IMAGE=$(jq -r \
+              '.properties.template.containers[] | select(.name == "hr-app") | .image' \
+              <<< "$REVISION_JSON")
+
+            HEALTH=$(jq -r '.properties.healthState' <<< "$REVISION_JSON")
+            PROVISIONING=$(jq -r '.properties.provisioningState' <<< "$REVISION_JSON")
+
+            if [[ "$ACTUAL_IMAGE" != "$IMAGE_REFERENCE" ]]; then
+              echo "::error::Revision image does not match the published digest."
+              exit 1
+            fi
+
+            if [[ "$PROVISIONING" == "Failed" ]]; then
+              echo "::error::Revision provisioning failed."
+              exit 1
+            fi
+
+            APP_JSON=$(az containerapp show \
+              --name "$CONTAINER_APP_NAME" \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --output json)
+
+            READY_REVISION=$(jq -r \
+              '.properties.latestReadyRevisionName' <<< "$APP_JSON")
+
+            HOSTNAME=$(jq -r \
+              '.properties.configuration.ingress.fqdn' <<< "$APP_JSON")
+
+            echo "Attempt $attempt: revision=$TARGET_REVISION health=$HEALTH ready=$READY_REVISION"
+
+            if [[ "$HEALTH" == "Healthy" && "$READY_REVISION" == "$TARGET_REVISION" ]]; then
+              if curl --fail --silent --show-error --max-time 15 \
+                "https://$HOSTNAME/actuator/health/readiness" \
+                | jq -e '.status == "UP"' > /dev/null; then
+                {
+                  echo "### Application deployment verified"
+                  echo ""
+                  echo "- Revision: $TARGET_REVISION"
+                  echo "- Image: $IMAGE_REFERENCE"
+                  echo "- URL: https://$HOSTNAME"
+                  echo "- Readiness: UP"
+                } | tee -a "$GITHUB_STEP_SUMMARY"
+
+                exit 0
+              fi
+            fi
+
+            sleep 15
+          done
+
+          echo "::error::The target revision did not become healthy within the verification window."
+          exit 1
