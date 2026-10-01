@@ -138,7 +138,7 @@ jobs:
       IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 
     outputs:
-      image_reference: ${{ steps.image.outputs.image_reference }}
+      image_digest: ${{ steps.image.outputs.image_digest }}
 
     defaults:
       run:
@@ -148,8 +148,8 @@ jobs:
       - name: Check registry variables
         run: |
           set -euo pipefail
-          : "${ACR_NAME:?Set ACR_NAME in dev-app variables}"
-          : "${ACR_LOGIN_SERVER:?Set ACR_LOGIN_SERVER in dev-app variables}"
+          : "${ACR_NAME:?Set ACR_NAME in dev-app secrets}"
+          : "${ACR_LOGIN_SERVER:?Set ACR_LOGIN_SERVER in dev-app secrets}"
 
       - name: Download verified Docker image
         uses: actions/download-artifact@v5
@@ -190,15 +190,13 @@ jobs:
 
           [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
 
-          IMAGE_REFERENCE="$ACR_LOGIN_SERVER/$IMAGE_REPOSITORY@$IMAGE_DIGEST"
-
-          echo "image_reference=$IMAGE_REFERENCE" >> "$GITHUB_OUTPUT"
+          echo "image_digest=$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
 
           {
             echo "### Published application image"
             echo ""
             echo "- Tag: $IMAGE_TAG"
-            echo "- Deployment reference: $IMAGE_REFERENCE"
+            echo "- Image digest: $IMAGE_DIGEST"
             echo "- Source commit: $GITHUB_SHA"
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
@@ -223,7 +221,9 @@ jobs:
     env:
       AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
       CONTAINER_APP_NAME: ${{ secrets.CONTAINER_APP_NAME }}
-      IMAGE_REFERENCE: ${{ needs.publish.outputs.image_reference }}
+      ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+      IMAGE_REPOSITORY: hr-app
+      IMAGE_DIGEST: ${{ needs.publish.outputs.image_digest }}
 
     defaults:
       run:
@@ -235,7 +235,16 @@ jobs:
           set -euo pipefail
           : "${AZURE_RESOURCE_GROUP:?Set AZURE_RESOURCE_GROUP}"
           : "${CONTAINER_APP_NAME:?Set CONTAINER_APP_NAME in dev-app}"
-          : "${IMAGE_REFERENCE:?Published image reference is missing}"
+          : "${ACR_LOGIN_SERVER:?Set ACR_LOGIN_SERVER in dev-app}"
+          : "${IMAGE_DIGEST:?Published image digest is missing}"
+
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Published image digest is invalid."
+            exit 1
+          fi
+
+          echo "IMAGE_REFERENCE=$ACR_LOGIN_SERVER/$IMAGE_REPOSITORY@$IMAGE_DIGEST" \
+            >> "$GITHUB_ENV"
 
       - name: Login to Azure using OIDC
         uses: azure/login@v2
