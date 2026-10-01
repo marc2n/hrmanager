@@ -13,6 +13,7 @@ Spring Boot application for managing employees and departments. It uses PostgreS
 - OpenTelemetry
 - Grafana LGTM
 - Maven
+- JaCoCo coverage reporting
 
 ## Configuration
 
@@ -36,6 +37,38 @@ Services:
 | HR application | http://localhost:8080 | REST API |
 | Grafana LGTM | http://localhost:3000 | Dashboards, logs, metrics, and traces |
 | PostgreSQL | localhost:5432 | Application database |
+
+## Tests and coverage
+
+The project uses service and controller unit tests plus Spring Boot / MockMvc integration tests with H2. JaCoCo 0.8.14 collects coverage during the tests and generates a report in the Maven `test` phase.
+
+With JDK 21 installed, run:
+
+```bash
+chmod +x mvnw
+./mvnw -B -ntp clean verify
+```
+
+On Windows PowerShell:
+
+```powershell
+.\mvnw.cmd -B -ntp clean verify
+```
+
+After a successful run, open `target/site/jacoco/index.html` in a browser to inspect coverage by package and class. Surefire test results are available in `target/surefire-reports/`.
+
+The [CI workflow](.github/workflows/ci.yml) runs the same Maven command and uploads two artifacts:
+
+| Artifact | Contents |
+| --- | --- |
+| `test-reports` | Surefire test results |
+| `jacoco-coverage-report` | JaCoCo coverage report |
+
+To view coverage from CI, open a completed run under [GitHub Actions](https://github.com/marc2n/hrmanager/actions/workflows/ci.yml), download `jacoco-coverage-report` from its artifacts, extract the archive, and open `index.html`.
+
+[The run for the JaCoCo addition](https://github.com/marc2n/hrmanager/actions/runs/36871994430) passed all 32 tests with no failures, errors, or skipped tests, generated the coverage report, and uploaded it successfully.
+
+Coverage is currently reported, not enforced: the POM does not configure a `jacoco:check` goal or a minimum coverage threshold. H2 integration tests also do not replace testing against PostgreSQL.
 
 ## Observability
 
