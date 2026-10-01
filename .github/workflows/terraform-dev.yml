@@ -86,10 +86,10 @@ jobs:
       - name: Check required Azure variables
         run: |
           set -euo pipefail
-          : "${ARM_CLIENT_ID:?Set AZURE_CLIENT_ID in dev-infra variables}"
-          : "${ARM_TENANT_ID:?Set AZURE_TENANT_ID in repository variables}"
-          : "${ARM_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID in repository variables}"
-          : "${TF_VAR_postgres_admin_password:?Set POSTGRES_ADMIN_PASSWORD in dev-infra secrets
+          : "${ARM_CLIENT_ID:?Set AZURE_CLIENT_ID in dev-infra secrets}"
+          : "${ARM_TENANT_ID:?Set AZURE_TENANT_ID in repository secrets}"
+          : "${ARM_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID in repository secrets}"
+          : "${TF_VAR_postgres_admin_password:?Set POSTGRES_ADMIN_PASSWORD in dev-infra secrets}"
 
       - name: Initialize remote backend
         run: terraform init -lockfile=readonly
